@@ -9,85 +9,116 @@ import (
 	"github.com/pkg/errors"
 )
 
-type erc20Builder func(context.Context, *contracts.ERC20Caller) error
-
 type ERC20Gateway struct {
 	ethCaller bind.ContractCaller
-	address   common.Address
-	erc20     *ERC20
-	builders  []erc20Builder
-	ctx       context.Context
+	statement *statement
+	Error     error
 }
 
 func New(ethCaller bind.ContractCaller) *ERC20Gateway {
 	return &ERC20Gateway{
 		ethCaller: ethCaller,
-		erc20:     &ERC20{},
-		builders:  make([]erc20Builder, 0, 1),
+		statement: &statement{},
 	}
 }
 
-func (erc20Query *ERC20Gateway) WithContext(ctx context.Context) *ERC20Gateway {
-	erc20Query.ctx = ctx
-	return erc20Query
+func (g *ERC20Gateway) getInstance() *ERC20Gateway {
+	if g.statement == nil {
+		// it's should create a new session or not?
+		g.statement = &statement{}
+	}
+
+	if g.statement.ctx == nil {
+		g.statement.ctx = context.Background()
+	}
+
+	return g
 }
 
-func (erc20Query *ERC20Gateway) WithAddress(address common.Address) *ERC20Gateway {
-	erc20Query.address = address
-	return erc20Query
+func (g *ERC20Gateway) Session() *ERC20Gateway {
+	session := &ERC20Gateway{
+		ethCaller: g.ethCaller,
+		statement: g.statement.clone(),
+	}
+	return session
 }
 
-func (g *ERC20Gateway) Find() (*ERC20, error) {
-	erc20Contract, err := contracts.NewERC20Caller(g.address, g.ethCaller)
+func (g *ERC20Gateway) WithAddress(address common.Address) *ERC20Gateway {
+	newGateway := g.Session()
+	newGateway.statement.address = address
+	return newGateway
+}
+
+func (g *ERC20Gateway) WithContext(ctx context.Context) *ERC20Gateway {
+	newGateway := g.Session()
+	newGateway.statement.ctx = ctx
+	return newGateway
+}
+
+func (g *ERC20Gateway) AddError(err error) error {
+	if g.Error == nil {
+		g.Error = err
+	} else if g.Error != nil {
+		g.Error = errors.Wrap(g.Error, err.Error())
+	}
+	return g.Error
+}
+
+func (g *ERC20Gateway) Find(result *ERC20) (tx *ERC20Gateway) {
+	tx = g.getInstance()
+
+	erc20Contract, err := contracts.NewERC20Caller(g.statement.address, g.ethCaller)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		tx.AddError(errors.WithStack(err))
+		return
 	}
 
-	if g.ctx == nil {
-		g.ctx = context.Background()
+	if g.statement.ctx == nil {
+		g.statement.ctx = context.Background()
 	}
 
-	for _, b := range g.builders {
-		if err := b(g.ctx, erc20Contract); err != nil {
-			return nil, errors.WithStack(err)
+	for _, builder := range g.statement.builders {
+		if err := builder(g.statement.ctx, erc20Contract, result); err != nil {
+			tx.AddError(errors.WithStack(err))
 		}
 	}
 
-	return g.erc20, nil
+	return
 }
 
-func (erc20Query *ERC20Gateway) Name() *ERC20Gateway {
-	erc20Query.builders = append(erc20Query.builders, func(ctx context.Context, caller *contracts.ERC20Caller) error {
+func (g *ERC20Gateway) Name() (tx *ERC20Gateway) {
+	tx = g.getInstance()
+	tx.statement.builders = append(tx.statement.builders, func(ctx context.Context, caller *contracts.ERC20Caller, erc20 *ERC20) error {
 		val, err := caller.Name(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		erc20Query.erc20.Name = val
+		erc20.Name = val
 		return nil
 	})
-	return erc20Query
+	return tx
 }
 
-func (erc20Query *ERC20Gateway) Decimals() *ERC20Gateway {
-	erc20Query.builders = append(erc20Query.builders, func(ctx context.Context, caller *contracts.ERC20Caller) error {
+func (g *ERC20Gateway) Decimals() *ERC20Gateway {
+	g.statement.builders = append(g.statement.builders, func(ctx context.Context, caller *contracts.ERC20Caller, erc20 *ERC20) error {
 		val, err := caller.Decimals(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		erc20Query.erc20.Decimals = val
+		erc20.Decimals = val
 		return nil
 	})
-	return erc20Query
+	return g
 }
 
-func (erc20Query *ERC20Gateway) Symbol() *ERC20Gateway {
-	erc20Query.builders = append(erc20Query.builders, func(ctx context.Context, caller *contracts.ERC20Caller) error {
+func (g *ERC20Gateway) Symbol() *ERC20Gateway {
+	g.statement.builders = append(g.statement.builders, func(ctx context.Context, caller *contracts.ERC20Caller, erc20 *ERC20) error {
 		val, err := caller.Symbol(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		erc20Query.erc20.Symbol = val
+		erc20.Symbol = val
 		return nil
 	})
-	return erc20Query
+	return g
 }
