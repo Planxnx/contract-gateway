@@ -6,6 +6,7 @@ import (
 	"github.com/Planxnx/contract-gateway/contracts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/holiman/uint256"
 	"github.com/pkg/errors"
 )
 
@@ -78,8 +79,9 @@ func (g *ERC20Gateway) Find(result *ERC20) (tx *ERC20Gateway) {
 	}
 
 	for _, builder := range g.statement.builders {
-		if err := builder(g.statement.ctx, erc20Contract, result); err != nil {
+		if err := builder(&bind.CallOpts{Context: g.statement.ctx}, erc20Contract, result); err != nil {
 			tx.AddError(errors.WithStack(err))
+			return
 		}
 	}
 
@@ -88,8 +90,8 @@ func (g *ERC20Gateway) Find(result *ERC20) (tx *ERC20Gateway) {
 
 func (g *ERC20Gateway) Name() (tx *ERC20Gateway) {
 	tx = g.getInstance()
-	tx.statement.builders = append(tx.statement.builders, func(ctx context.Context, caller *contracts.ERC20Caller, erc20 *ERC20) error {
-		val, err := caller.Name(&bind.CallOpts{Context: ctx})
+	tx.statement.builders = append(tx.statement.builders, func(callopts *bind.CallOpts, caller *contracts.ERC20Caller, erc20 *ERC20) error {
+		val, err := caller.Name(callopts)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -100,8 +102,8 @@ func (g *ERC20Gateway) Name() (tx *ERC20Gateway) {
 }
 
 func (g *ERC20Gateway) Decimals() *ERC20Gateway {
-	g.statement.builders = append(g.statement.builders, func(ctx context.Context, caller *contracts.ERC20Caller, erc20 *ERC20) error {
-		val, err := caller.Decimals(&bind.CallOpts{Context: ctx})
+	g.statement.builders = append(g.statement.builders, func(callopts *bind.CallOpts, caller *contracts.ERC20Caller, erc20 *ERC20) error {
+		val, err := caller.Decimals(callopts)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -112,8 +114,8 @@ func (g *ERC20Gateway) Decimals() *ERC20Gateway {
 }
 
 func (g *ERC20Gateway) Symbol() *ERC20Gateway {
-	g.statement.builders = append(g.statement.builders, func(ctx context.Context, caller *contracts.ERC20Caller, erc20 *ERC20) error {
-		val, err := caller.Symbol(&bind.CallOpts{Context: ctx})
+	g.statement.builders = append(g.statement.builders, func(callopts *bind.CallOpts, caller *contracts.ERC20Caller, erc20 *ERC20) error {
+		val, err := caller.Symbol(callopts)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -121,4 +123,49 @@ func (g *ERC20Gateway) Symbol() *ERC20Gateway {
 		return nil
 	})
 	return g
+}
+
+func (g *ERC20Gateway) BalanceOf(address common.Address) (tx *ERC20Gateway) {
+	tx = g.getInstance()
+	tx.statement.builders = append(tx.statement.builders, func(callopts *bind.CallOpts, caller *contracts.ERC20Caller, erc20 *ERC20) error {
+		val, err := caller.BalanceOf(callopts, address)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		valUint256 := new(uint256.Int)
+		valUint256.SetFromBig(val)
+		erc20.BalanceOf = valUint256
+		return nil
+	})
+	return tx
+}
+
+func (g *ERC20Gateway) TotalSupply() (tx *ERC20Gateway) {
+	tx = g.getInstance()
+	tx.statement.builders = append(tx.statement.builders, func(callopts *bind.CallOpts, caller *contracts.ERC20Caller, erc20 *ERC20) error {
+		val, err := caller.TotalSupply(callopts)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		valUint256 := new(uint256.Int)
+		valUint256.SetFromBig(val)
+		erc20.TotalSupply = valUint256
+		return nil
+	})
+	return tx
+}
+
+func (g *ERC20Gateway) Allowance(owner common.Address, spender common.Address) (tx *ERC20Gateway) {
+	tx = g.getInstance()
+	tx.statement.builders = append(tx.statement.builders, func(callopts *bind.CallOpts, caller *contracts.ERC20Caller, erc20 *ERC20) error {
+		val, err := caller.Allowance(callopts, owner, spender)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		valUint256 := new(uint256.Int)
+		valUint256.SetFromBig(val)
+		erc20.Allowance = valUint256
+		return nil
+	})
+	return tx
 }

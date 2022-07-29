@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"github.com/Planxnx/contract-gateway/contracts"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 )
 
-type erc20Builder func(context.Context, *contracts.ERC20Caller, *ERC20) error
+type erc20Builder func(*bind.CallOpts, *contracts.ERC20Caller, *ERC20) error
 
 type statement struct {
 	ctx      context.Context
