@@ -2,6 +2,7 @@ package erc20
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/Planxnx/contract-gateway/contracts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -56,6 +57,12 @@ func (g *ERC20Gateway) WithContext(ctx context.Context) *ERC20Gateway {
 	return newGateway
 }
 
+func (g *ERC20Gateway) WithBlockNumber(blockNumber uint64) *ERC20Gateway {
+	newGateway := g.Session()
+	newGateway.statement.blocknumber = big.NewInt(int64(blockNumber))
+	return newGateway
+}
+
 func (g *ERC20Gateway) AddError(err error) error {
 	if g.Error == nil {
 		g.Error = err
@@ -78,8 +85,9 @@ func (g *ERC20Gateway) Find(result *ERC20) (tx *ERC20Gateway) {
 		g.statement.ctx = context.Background()
 	}
 
+	callOpts := &bind.CallOpts{Context: g.statement.ctx, BlockNumber: g.statement.blocknumber}
 	for _, builder := range g.statement.builders {
-		if err := builder(&bind.CallOpts{Context: g.statement.ctx}, erc20Contract, result); err != nil {
+		if err := builder(callOpts, erc20Contract, result); err != nil {
 			tx.AddError(errors.WithStack(err))
 			return
 		}

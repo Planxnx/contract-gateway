@@ -2,6 +2,7 @@ package erc20
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/Planxnx/contract-gateway/contracts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -11,9 +12,10 @@ import (
 type erc20Builder func(*bind.CallOpts, *contracts.ERC20Caller, *ERC20) error
 
 type statement struct {
-	ctx      context.Context
-	address  common.Address
-	builders []erc20Builder
+	ctx         context.Context
+	address     common.Address
+	blocknumber *big.Int
+	builders    []erc20Builder
 }
 
 func (s *statement) clone() *statement {
